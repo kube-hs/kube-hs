@@ -27,11 +27,10 @@ import Kube.Config.Types
 import Optics
 import System.Environment (getEnv)
 import System.Exit (ExitCode (..))
-import System.FilePath ((</>))
-import System.Process (CmdSpec (ShellCommand), CreateProcess (..), StdStream (Inherit), readCreateProcessWithExitCode)
+import System.Process qualified as P
 
 defaultKubeConfigPath :: IO FilePath
-defaultKubeConfigPath = getEnv "KUBECONFIG" <|> (</> ".kube" </> "config") <$> getEnv "HOME"
+defaultKubeConfigPath = getEnv "KUBECONFIG" <|> (<> ".kube/config") <$> getEnv "HOME"
 
 loadKubeConfig :: FilePath -> IO (Either Error Config)
 loadKubeConfig = fmap (first fromYamlError) . Y.decodeFileEither
@@ -47,6 +46,7 @@ getCurrentContext cfg =
   maybeToRight (ContextNotFound ctxName) $ cfg ^. (#contexts % to unNamedMap % at ctxName)
  where
   ctxName = cfg ^. #currentContext
+  maybeToRight :: e -> Maybe a -> Either e a
   maybeToRight e = maybe (Left e) Right
 
 decodeBase64 :: Text -> Either Error Text
@@ -56,7 +56,7 @@ decodeBase64 t = case B64.decodeBase64Untyped (encodeUtf8 t) of
     Left e -> Left $ UnicodeError $ pack $ show e
     Right t'' -> Right $ strip t''
 
-runExecAuth :: Exec -> IO (Either Error Text)
+runExecAuth :: Exec -> IO (Either Error Credentials)
 runExecAuth Exec{command, args, env} = do
   let cmd = unlines $ unpack <$> command : fromMaybe [] args
   let envVars =
@@ -66,41 +66,28 @@ runExecAuth Exec{command, args, env} = do
           . M.toList
           . unNamedMap
           <$> env
-  (exitCode, out, err) <- readCreateProcessWithExitCode (process cmd envVars) ""
+  (exitCode, out, err) <- P.readCreateProcessWithExitCode (process cmd envVars) ""
   pure $ case exitCode of
-    ExitSuccess -> Right $ strip $ pack out
+    ExitSuccess -> Right $ Token $ strip $ pack out
     ExitFailure code -> Left $ ExecError code (pack out) (pack err)
 
-process :: String -> Maybe [(String, String)] -> CreateProcess
-process cmd envVars =
-  CreateProcess
-    { cmdspec = ShellCommand cmd
-    , env = envVars
-    , cwd = Nothing
-    , std_in = Inherit
-    , std_out = Inherit
-    , std_err = Inherit
-    , close_fds = False
-    , create_group = False
-    , delegate_ctlc = False
-    , detach_console = False
-    , create_new_console = False
-    , new_session = False
-    , child_group = Nothing
-    , child_user = Nothing
-    , use_process_jobs = False
-    }
+process :: String -> Maybe [(String, String)] -> P.CreateProcess
+process cmd envVars = (P.proc "sh" ["-c", cmd]){P.env = envVars}
 
-resolveKubeCredentials :: AuthSource -> IO Credentials
-resolveKubeCredentials (TokenFile f) = pack <$> readFile f <&> Token
-resolveKubeCredentials (TokenSource t) = pure $ Token t
-resolveKubeCredentials (BasicAuthSource u p) = pure $ BasicAuth u p
-resolveKubeCredentials (CertsSource c k) = Certs <$> resolveCertSource c <*> resolveKeySource k
- where
-  resolveCertSource (CertFile f) = pack <$> readFile f
-  resolveCertSource (CertInline t) = either (fail . show) pure $ decodeBase64 t
-  resolveKeySource (KeyFile f) = pack <$> readFile f
-  resolveKeySource (KeyInline t) = either (fail . show) pure $ decodeBase64 t
-resolveKubeCredentials (ExecSource e) = do
-  res <- runExecAuth e
-  either (fail . show) (pure . Token) res
+resolveKubeCredentials :: AuthSource -> IO (Either Error Credentials)
+resolveKubeCredentials (TokenFile f) = Right . Token . pack <$> readFile f
+resolveKubeCredentials (TokenSource t) = pure $ Right $ Token t
+resolveKubeCredentials (BasicAuthSource u p) = pure $ Right $ BasicAuth u p
+resolveKubeCredentials (CertsSource c k) = do
+  cert <- resolveCertSource c
+  key <- resolveKeySource k
+  pure $ Certs <$> cert <*> key
+resolveKubeCredentials (ExecSource e) = runExecAuth e
+
+resolveCertSource :: CertSource -> IO (Either Error Text)
+resolveCertSource (CertFile f) = Right . pack <$> readFile f
+resolveCertSource (CertInline t) = pure $ decodeBase64 t
+
+resolveKeySource :: KeySource -> IO (Either Error Text)
+resolveKeySource (KeyFile f) = Right . pack <$> readFile f
+resolveKeySource (KeyInline t) = pure $ decodeBase64 t

@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -72,36 +73,6 @@ instance HasValueField User where
 instance HasValueField EnvVar where
   valueField = "value"
 
-instance FromJSON Preferences
-instance ToJSON Preferences
-
-instance FromJSON Extension
-instance ToJSON Extension
-
-instance FromJSON Context
-instance ToJSON Context
-
-instance FromJSON EnvVar
-instance ToJSON EnvVar
-
-instance FromJSON Cluster
-instance ToJSON Cluster
-
-instance FromJSON AuthProvider
-instance ToJSON AuthProvider
-
-instance FromJSON Exec
-instance ToJSON Exec
-
-instance FromJSON User
-instance ToJSON User
-
-instance FromJSON Config
-instance ToJSON Config
-
-instance FromJSON ExecInteractiveMode
-instance ToJSON ExecInteractiveMode
-
 type Version = Text
 type Kind = Text
 
@@ -109,12 +80,12 @@ data Preferences = Preferences
   { colors :: Maybe Bool
   , extensions :: Maybe [Extension]
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data Extension = Extension
   { name :: Text
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data Context = Context
   { cluster :: Text
@@ -122,15 +93,15 @@ data Context = Context
   , namespace :: Maybe Text
   , extensions :: Maybe [Extension]
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data EnvVar = EnvVar
   { name :: Text
   , value :: Text
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
-data ExecInteractiveMode = Never | IfAvailable | Always deriving (Show, Eq, Generic)
+data ExecInteractiveMode = Never | IfAvailable | Always deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data Exec = Exec
   { command :: Text
@@ -141,7 +112,7 @@ data Exec = Exec
   , provideClusterInfo :: Maybe Bool
   , interactiveMode :: Maybe ExecInteractiveMode
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data Cluster = Cluster
   { server :: URI
@@ -153,18 +124,18 @@ data Cluster = Cluster
   , disableCompression :: Maybe Bool
   , extensions :: Maybe [Extension]
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data AuthProvider
   = AuthProvider
   { name :: Text
   , config :: Map Text Text
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data User
   = User
-  { clinetCertificate :: Maybe Text
+  { clientCertificate :: Maybe Text
   , clientCertificateData :: Maybe Text
   , clientKey :: Maybe Text
   , clientKeyData :: Maybe Text
@@ -180,7 +151,7 @@ data User
   , exec :: Maybe Exec
   , extensions :: Maybe [Extension]
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data Config
   = Config
@@ -193,7 +164,7 @@ data Config
   , currentContext :: Key
   , extensions :: Maybe [Extension]
   }
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data CertSource = CertFile FilePath | CertInline Text deriving (Show, Eq)
 data KeySource = KeyFile FilePath | KeyInline Text deriving (Show, Eq)
