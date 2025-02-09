@@ -19,6 +19,10 @@ module Kube.Config.Types.Internal (
   User (..),
   Error (..),
   NamedMap (..),
+  AuthSource (..),
+  CertSource (..),
+  KeySource (..),
+  Credentials (..),
 ) where
 
 import Data.Aeson
@@ -191,12 +195,33 @@ data Config
   }
   deriving (Show, Eq, Generic)
 
+data CertSource = CertFile FilePath | CertInline Text deriving (Show, Eq)
+data KeySource = KeyFile FilePath | KeyInline Text deriving (Show, Eq)
+
+data AuthSource
+  = TokenFile FilePath
+  | TokenSource Text
+  | CertsSource CertSource KeySource
+  | ExecSource Exec
+  | BasicAuthSource Text Text
+  deriving (Show, Eq)
+
+data Credentials
+  = Token Text
+  | Certs Text Text
+  | BasicAuth Text Text
+  deriving (Show, Eq)
+
 data Error
   = ParseError Text
   | ConfigNotFound FilePath
   | ContextNotFound Key
   | ClusterNotFound Key
   | UserNotFound Key
+  | Base64DecodeError Text
+  | FileReadError Text
+  | UnicodeError Text
+  | ExecError Int Text Text
   deriving (Show, Eq)
 
 makeFieldLabels ''Config
