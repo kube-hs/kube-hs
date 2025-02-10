@@ -5,6 +5,12 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{- |
+   Module      :  Kube.Config
+   Description :  Functions for loading and parsing kubeconfig files.
+
+   Maintainer  :  Andrii Nasinnyk <anasinnyk@pm.me>
+-}
 module Kube.Config (
   module Kube.Config.Types,
   defaultKubeConfigPath,
@@ -29,18 +35,22 @@ import System.Environment (getEnv)
 import System.Exit (ExitCode (..))
 import System.Process qualified as P
 
+-- | Get the default path to the kubeconfig file.
 defaultKubeConfigPath :: IO FilePath
-defaultKubeConfigPath = getEnv "KUBECONFIG" <|> (<> ".kube/config") <$> getEnv "HOME"
+defaultKubeConfigPath = getEnv "KUBECONFIG" <|> (<> "/.kube/config") <$> getEnv "HOME"
 
+-- | Load a kubeconfig file from the given path.
 loadKubeConfig :: FilePath -> IO (Either Error Config)
 loadKubeConfig = fmap (first fromYamlError) . Y.decodeFileEither
  where
   fromYamlError :: Y.ParseException -> Error
   fromYamlError = ParseError . pack . show
 
+-- | Load the default kubeconfig file.
 loadDefaultKubeConfig :: IO (Either Error Config)
 loadDefaultKubeConfig = defaultKubeConfigPath >>= loadKubeConfig
 
+-- | Get the current context from the config.
 getCurrentContext :: Config -> Either Error Context
 getCurrentContext cfg =
   maybeToRight (ContextNotFound ctxName) $ cfg ^. (#contexts % to unNamedMap % at ctxName)
@@ -74,6 +84,7 @@ runExecAuth Exec{command, args, env} = do
 process :: String -> Maybe [(String, String)] -> P.CreateProcess
 process cmd envVars = (P.proc "sh" ["-c", cmd]){P.env = envVars}
 
+-- | Resolve the credentials from the given auth source.
 resolveKubeCredentials :: AuthSource -> IO (Either Error Credentials)
 resolveKubeCredentials (TokenFile f) = Right . Token . pack <$> readFile f
 resolveKubeCredentials (TokenSource t) = pure $ Right $ Token t

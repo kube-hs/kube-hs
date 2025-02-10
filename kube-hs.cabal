@@ -71,3 +71,5 @@ test-suite kube-hs-test
   build-depends:
     base ^>=4.19.2.0,
     kube-hs,
+    tasty ^>=1.5,
+    tasty-hunit ^>=0.10,
