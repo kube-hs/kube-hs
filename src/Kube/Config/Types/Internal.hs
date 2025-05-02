@@ -229,9 +229,9 @@ instance ToJSON AuthProvider where
 
 data User
   = User
-  { clientCertificate :: Maybe Text,
+  { clientCertificate :: Maybe FilePath,
     clientCertificateData :: Maybe Text,
-    clientKey :: Maybe Text,
+    clientKey :: Maybe FilePath,
     clientKeyData :: Maybe Text,
     token :: Maybe Text,
     tokenFile :: Maybe Text,
